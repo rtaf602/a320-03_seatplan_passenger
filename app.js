@@ -21,19 +21,23 @@ function rawApi(body){
 }
 function api(body){body.s=sess;return rawApi(body)}
 
-/* ---------- aircraft layout (nose to tail) — ตามไฟล์ Seat Plan 320(03) (For Admin) ----------
- * row item  {n, g:[left, right]}  each side is 3 seat positions wide: letters = seats, '_' = empty position,
- *           '#TEXT' = furniture (SOFA), '' = nothing. cap = caption beside the left seat (Commander Center).
- * monitor   {mon:'B9'|'A3', sides:['L','R'], ovhd}  B = in front of row, A = behind row (end of zone).
- * deco      {deco:['TABLE','TABLE']} furniture row between seat rows. */
+/* ---------- aircraft layout (nose to tail) — ขนาดตามไฟล์ Seat Plan 320(03) (For Admin) ----------
+ * หน่วยวัด = ความกว้าง 1 ที่นั่ง (ในชีท 84 px) · แต่ละฝั่งกว้าง 3 ที่นั่ง · ทางเดินกว้าง 1.5 ที่นั่ง
+ * row item  {n, g:[left, right]}  each side is one of:
+ *           'ABC' / 'D_F' / 'BC'  seats (1 seat wide each, '_' = empty seat position), centred in the side
+ *           {seat:'A', w:2, cap}  one wide seat (Commander Center 1A = 2 seats wide)
+ *           {t:'SOFA', w:3, rows:2}  furniture w seats wide, covering `rows` seat rows
+ *           ''  nothing
+ * monitor   {mon:'B9'|'A3', sides, ovhd}  2 seats wide, centred · B = in front of row, A = behind row (end of zone)
+ * deco      {deco:[{t:'TABLE',w:1},{t:'TABLE',w:2}]}  furniture row between seat rows (one entry per side) */
 var GW=3,AIRCRAFT='A320-03',ADMIN_FILE='Seat Plan 320(03) (For Admin)';
-var LR=['L','R'],ABC=['ABC','DEF'];
+var LR=['L','R'],ABC=['ABC','DEF'],MON_W=2;
 function rows(nums,g){return nums.map(function(n){return {n:n,g:g}})}
 function mon(pos,sides,ovhd){return {mon:pos,sides:sides||LR,ovhd:!!ovhd}}
 var ZONES=[
- {key:'CR',name:'FRONT CREW ZONE',title:'Front Crew Zone',fixed:true,items:[mon('B1'),{n:1,g:['A','D_F'],cap:'Commander Center'}]},
- {key:'OA',name:'VVIP OA',title:'VVIP OA',items:[mon('B2',['L']),{n:2,g:['A','#SOFA']},{n:3,g:['A','']},mon('A3')]},
- {key:'OB',name:'VIP OB',title:'VIP OB',items:[mon('B5'),{n:5,g:['B','DF']},{deco:['TABLE','TABLE']},{n:6,g:['B','DF']},mon('A6')]},
+ {key:'CR',name:'FRONT CREW ZONE',title:'Front Crew Zone',fixed:true,items:[mon('B1'),{n:1,g:[{seat:'A',w:2,cap:'Commander Center'},'D_F']}]},
+ {key:'OA',name:'VVIP OA',title:'VVIP OA',items:[mon('B2',['L']),{n:2,g:['A',{t:'SOFA',w:3,rows:2}]},{n:3,g:['A','']},mon('A3')]},
+ {key:'OB',name:'VIP OB',title:'VIP OB',items:[mon('B5'),{n:5,g:['B','DF']},{deco:[{t:'TABLE',w:1},{t:'TABLE',w:2}]},{n:6,g:['B','DF']},mon('A6')]},
  {key:'OC',name:'VVIP OC',title:'VVIP OC',items:[mon('B7')].concat(rows([7,8],['BC','DF']),[mon('A8')])},
  {key:'OD',name:'PASSENGER OD',title:'Passenger OD',items:[mon('B9')].concat(rows([9],ABC),[mon('B10',LR,1)],rows([10,11],ABC),[mon('B12',LR,1)],
    rows([12,14],ABC),[mon('B15',LR,1)],rows([15,16],ABC),[mon('B17',LR,1)],rows([17,18],ABC))}
@@ -42,7 +46,9 @@ var SEATS=[],SEAT={},ROWS=[];
 ZONES.forEach(function(z){z.items.forEach(function(it){
   if(it.n==null)return;
   ROWS.push(String(it.n));
-  it.g.forEach(function(grp){if(grp.charAt(0)==='#')return;grp.replace(/_/g,'').split('').forEach(function(L){var id=it.n+L;SEATS.push(id);SEAT[id]={zone:z.key,row:String(it.n),mon:false}})});
+  it.g.forEach(function(grp){
+    var ls=typeof grp==='string'?grp.replace(/_/g,'').split(''):(grp.seat?[grp.seat]:[]);
+    ls.forEach(function(L){var id=it.n+L;SEATS.push(id);SEAT[id]={zone:z.key,row:String(it.n),mon:false,w:grp.w||1,cap:grp.cap||''}})});
 })});
 /* label for a seat: 1A is the Commander Center */
 function seatName(id){return id==='1A'?'Commander Center 1A':'ที่นั่ง '+id}
@@ -476,11 +482,13 @@ infoInputs.forEach(function(inp){
 /* ----- cabin ----- */
 function seatBtn(id,text,mon,ctx){
   var b=el('button','seat');b.type='button';b.dataset.id=id;
+  var w=SEAT[id].w||1;if(w>1){b.classList.add('wide');b.style.width=span(w)}
   if(mon)b.appendChild(el('span','m'));
   var s=el('span','s');s.appendChild(el('span','lt',text));b.appendChild(s);
   var st=status(id),crew=isCrew(id,ctx.crew),p=crew?(ctx.mode==='crew'?getCrewPax(id):null):getPax(id);
   b.dataset.s=st.s;if(mon)b.dataset.m=st.m;
   if(p){b.classList.add('occ');s.appendChild(el('span','nm',shortName(p)))}
+  else if(SEAT[id].cap)s.appendChild(el('span','cap',SEAT[id].cap));
   if(crew)b.classList.add('crew');
   if(crew&&ctx.mode==='crew')b.classList.add('crewedit');
   if(!ctx.report&&((ctx.mode==='crew'&&crewPending(id))||(ctx.mode!=='crew'&&paxPending(id))))b.dataset.pending='1';
@@ -492,7 +500,11 @@ function seatBtn(id,text,mon,ctx){
   return b;
 }
 var MON_NAME=['จอปกติ','จอเสื่อม','จอเสีย'];
-function grpBox(n){var g=el('div','grp');g.style.minWidth='calc('+n+' * var(--sw) + '+(n-1)+' * var(--sg))';return g}
+/* width of w seats (with the small gaps between them) */
+function span(w){return 'calc('+w+' * var(--sw) + '+(w-1)+' * var(--sg))'}
+function grpBox(){var g=el('div','grp');g.style.width=span(GW);return g}
+function decoEl(d){var x=el('span','deco'+(d.rows>1?' span'+d.rows:''),d.t);x.style.width=span(d.w);
+  if(d.rows>1)x.style.left='calc('+(GW-d.w)/2+' * (var(--sw) + var(--sg)))';return x}
 function buildZones(host,report,mode){
   host.textContent='';var crew=crewRows(getCrew()),stats=zoneStats(),ctx={crew:crew,report:report,mode:mode};
   ZONES.forEach(function(z){
@@ -506,14 +518,14 @@ function buildZones(host,report,mode){
       else{cbox=null;box.appendChild(row)}
     }
     var lastRow='';
-    z.items.forEach(function(it,idx){
+    z.items.forEach(function(it){
       if(it.mon){
         var o=el('div','row ovhrow');o.appendChild(el('div','rowno'));
         LR.forEach(function(side,i){if(i)o.appendChild(el('div','aisle'));
-          var g=grpBox(GW);g.appendChild(el('div','gap'));
+          var g=grpBox();
           if(it.sides.indexOf(side)>=0){
             var id='MON-'+it.mon+'-'+side,st=status(id),txt=it.ovhd?'OVHD Monitor':'Monitor';
-            var b=el('span','ovh'+(it.ovhd?' ovhd':''),txt);b.dataset.m=st.m;
+            var b=el('span','ovh'+(it.ovhd?' ovhd':''),txt);b.dataset.m=st.m;b.style.width=span(MON_W);
             b.title=txt+(it.ovhd?' 12.0"':' 21.5"')+' '+(it.mon.charAt(0)==='B'?'หน้าแถว ':'หลังแถว ')+it.mon.slice(1)+' ('+(side==='L'?'ซ้าย':'ขวา')+') · '+MON_NAME[st.m]+(st.note?' · '+st.note:'');
             g.appendChild(b)}
           o.appendChild(g)});
@@ -521,19 +533,17 @@ function buildZones(host,report,mode){
       }
       if(it.deco){
         var d=el('div','row decorow');d.appendChild(el('div','rowno'));
-        it.deco.forEach(function(t,i){if(i)d.appendChild(el('div','aisle'));var g=grpBox(GW);if(t)g.appendChild(el('span','deco',t));d.appendChild(g)});
+        it.deco.forEach(function(x,i){if(i)d.appendChild(el('div','aisle'));var g=grpBox();if(x)g.appendChild(decoEl(x));d.appendChild(g)});
         put(d,lastRow);return;
       }
       var key=String(it.n);lastRow=key;
       var r2=el('div','row');r2.appendChild(el('div','rowno',key));
       it.g.forEach(function(grp,gi){
         if(gi)r2.appendChild(el('div','aisle'));
-        var g=grpBox(GW);
-        if(grp.charAt(0)==='#'){g.appendChild(el('span','deco tall',grp.slice(1)))}
-        else{
-          grp.split('').forEach(function(L){if(L==='_'){g.appendChild(el('div','gap'));return}g.appendChild(seatBtn(it.n+L,L,false,ctx))});
-          if(gi===0&&it.cap){g.classList.add('capgrp');g.appendChild(el('span','seatcap',it.cap))}
-        }
+        var g=grpBox();
+        if(typeof grp==='string')grp.split('').forEach(function(L){if(L==='_'){g.appendChild(el('div','gap'));return}g.appendChild(seatBtn(it.n+L,L,false,ctx))});
+        else if(grp.seat)g.appendChild(seatBtn(it.n+grp.seat,it.n+grp.seat,false,ctx));
+        else{g.classList.add('top');g.appendChild(decoEl(grp))}
         r2.appendChild(g)});
       put(r2,key);
     });
@@ -797,15 +807,19 @@ function excelModel(mode,blank){
   var seatObj=function(id,label,mon){var st=status(id),crew=!!set[SEAT[id].row];
     var p=crew?(crewMode?getCrewPax(id):null):getPax(id);
     return {label:label,s:st.s,mon:mon?st.m:null,crew:crew,name:p?shortName(p):''}};
+  /* each side -> list of parts {w, seat|null|deco} (widths in seats, centred by excel.js) */
+  var side=function(n,g){
+    if(typeof g==='string')return g.split('').map(function(L){return {w:1,seat:L==='_'?null:seatObj(n+L,L,false)}});
+    if(g.seat)return [{w:g.w,seat:seatObj(n+g.seat,(g.cap?g.cap+' ':'')+n+g.seat,false)}];
+    return [{w:g.w,deco:g.t,rows:g.rows||1}];
+  };
   var zones=ZONES.map(function(z){var v=stats[z.key],free=blank?(v.t-v.crew-v.bad):v.free,last='';
     return {title:z.title,free:free,items:z.items.map(function(it){
-      if(it.mon)return {type:'ovh',crew:!!set[it.mon.slice(1)],label:it.ovhd?'OVHD Monitor':'Monitor',
+      if(it.mon)return {type:'ovh',crew:!!set[it.mon.slice(1)],label:it.ovhd?'OVHD Monitor':'Monitor',w:MON_W,
         mon:LR.map(function(p){return it.sides.indexOf(p)<0?null:status('MON-'+it.mon+'-'+p).m})};
-      if(it.deco)return {type:'deco',crew:!!set[last],text:it.deco};
+      if(it.deco)return {type:'deco',crew:!!set[last],parts:it.deco};
       last=String(it.n);
-      return {type:'row',n:last,crew:!!set[last],cap:it.cap||'',groups:it.g.map(function(g){
-        if(g.charAt(0)==='#')return {deco:g.slice(1)};
-        return g.split('').map(function(L){return L==='_'?null:seatObj(it.n+L,L,false)})})};
+      return {type:'row',n:last,crew:!!set[last],sides:it.g.map(function(g){return side(it.n,g)})};
     })}});
   var b=bkk(),ls=M.lastSave;
   var meta=['ออกรายงาน '+b.d+' '+MON[b.M-1]+' '+String(b.y).slice(2)+' / '+p2(b.h)+':'+p2(b.m)+' TH-LT',

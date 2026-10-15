@@ -8,9 +8,10 @@
 var FONT='Tahoma';
 var C={ink:'14212E',muted:'566575',line:'C5D0DC',rowno:'35547C',cabin:'EEF4FA',accent:'1F5FA8',white:'FFFFFF',
   ok:'2E9D57',warn:'E2A400',bad:'D23B33',badSoft:'FBDAD7',crew:'D0102A',crewSoft:'FDE3E6',warnSoft:'FDF0C4'};
-// A320-03 columns: A margin · B row no · C pad · D E F left (3 seats) · G aisle · H I J right (3 seats) · K L pad · M margin
-var COLS=[1.5,5,3,11,11,11,5,11,11,11,3,4,1.5];
-var SIDE=[[4,5,6],[8,9,10]],FIRST=2,LAST=13;
+// A320-03 grid like Seat Plan 320(03) (For Admin): 1 seat = 2 columns (42 px each) · aisle = 1.5 seats
+// A margin · B row no · C..H left side (3 seats) · I aisle · J..O right side (3 seats) · P margin
+var COLS=[1.5,7,5.3,5.3,5.3,5.3,5.3,5.3,16.5,5.3,5.3,5.3,5.3,5.3,5.3,1.5];
+var SIDE0=[3,10],FIRST=2,LAST=16,INNER=[3,15],TOPC=16,LASTCOL='P';
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]}).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'')}
 function colName(c){var s='';while(c>0){var m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=(c-m-1)/26}return s}
@@ -75,7 +76,7 @@ var S={
 };
 var MONC=[C.ok,C.warn,C.bad];
 
-function seatCells(sh,r,c,seat,blank){
+function seatCells(sh,r,c,c2,seat,blank){
   // two rows: r = seat letter (top border = monitor bar), r+1 = name (bottom border = seat fault bar)
   var st=seat.s|0,crew=seat.crew,name=blank?'':(seat.name||''),occ=!!name;
   var line=crew?C.crew:st===2?C.bad:C.rowno,fill=C.white,fg=C.rowno;
@@ -85,13 +86,14 @@ function seatCells(sh,r,c,seat,blank){
   var label=seat.label+(st===2?'  ×':st===1?'  !':'');
   var top=seat.mon!=null?['thick',MONC[seat.mon|0]]:['thin',line];
   var bottom=st===1?['thick',C.warn]:['thin',line];
-  sh.set(r,c,label,{font:{b:1,sz:9,color:fg},fill:fill,align:{h:'center',v:'center'},border:{l:['thin',line],r:['thin',line],t:top}});
-  sh.set(r+1,c,name,{font:{sz:8,color:occ?C.white:C.ink},fill:fill,align:{h:'center',v:'center',wrap:1},border:{l:['thin',line],r:['thin',line],b:bottom}});
+  sh.merge(r,c,r,c2,label,{font:{b:1,sz:9,color:fg},fill:fill,align:{h:'center',v:'center'},border:{t:top}});
+  sh.merge(r+1,c,r+1,c2,name,{font:{sz:8,color:occ?C.white:C.ink},fill:fill,align:{h:'center',v:'center',wrap:1},border:{b:bottom}});
+  for(var k=r;k<=r+1;k++){sh.set(k,c,null,{border:{l:['thin',line]}});sh.set(k,c2,null,{border:{r:['thin',line]}})}
 }
-/* which grid columns a seat group uses: 3 positions per side, shorter groups are centred */
-function groupCols(gi,len){var c=SIDE[gi],off=Math.floor((3-len)/2);return c.slice(off,off+len)}
-function sideSpan(gi){return [SIDE[gi][0],SIDE[gi][2]]}
-var DECO={font:{b:1,sz:8,color:C.muted},fill:C.white,align:{h:'center'},border:{l:['dashed',C.line],r:['dashed',C.line],t:['dashed',C.line],b:['dashed',C.line]}};
+/* columns of a run of parts on one side (widths in seats), centred like the sheet: each seat = 2 columns */
+function place(gi,parts){var tot=0;parts.forEach(function(p){tot+=p.w});var c=SIDE0[gi]+(3-tot),out=[];
+  parts.forEach(function(p){out.push([c,c+2*p.w-1]);c+=2*p.w});return out}
+var DECO={font:{b:1,sz:8,color:C.muted},fill:'D9D9D9',align:{h:'center',v:'center'},border:{l:['thin',C.muted],r:['thin',C.muted],t:['thin',C.muted],b:['thin',C.muted]}};
 
 function build(m){
   var sh=new Sheet(),blank=!!m.blank,R;
@@ -99,41 +101,45 @@ function build(m){
   function blockEnd(s){sh.blocks.push([s,sh.row-1]);sh.h(sh.row,8);sh.row++}  // spacer row after each block
   /* header */
   var b0=blockStart();R=sh.row;
-  sh.merge(R,2,R,13,m.title,S.title);sh.h(R,24);R++;
-  var slots=[[2,4],[5,7],[8,10],[11,13]];
+  sh.merge(R,2,R,LAST,m.title,S.title);sh.h(R,24);R++;
+  var slots=[[2,4],[5,8],[9,11],[12,16]];
   function infoCell(r,slot,span,label,val){var c1=slots[slot][0],c2=slots[slot+span-1][1];
     sh.merge(r,c1,r,c2,label,mergeStyle(S.lab,{border:{t:['thin',C.line]}}));sh.merge(r+1,c1,r+1,c2,val||'-',S.val);
     sh.box(r,c1,r+1,c2,'thin',C.line)}
   m.info.forEach(function(row){var s=0;row.forEach(function(it){infoCell(R,s,it.span||1,it.label,it.val);s+=it.span||1});sh.h(R,12);sh.h(R+1,18);R+=2});
-  sh.merge(R,2,R,13,m.meta,mergeStyle(S.meta,{align:{wrap:1}}));sh.h(R,24);R++;
-  if(m.warn){sh.merge(R,2,R,13,m.warn,mergeStyle(S.warn,{align:{wrap:1}}));sh.h(R,20);R++}
-  sh.merge(R,2,R,13,m.legend,mergeStyle(S.meta,{align:{wrap:1}}));sh.h(R,26);R++;
+  sh.merge(R,2,R,LAST,m.meta,mergeStyle(S.meta,{align:{wrap:1}}));sh.h(R,24);R++;
+  if(m.warn){sh.merge(R,2,R,LAST,m.warn,mergeStyle(S.warn,{align:{wrap:1}}));sh.h(R,20);R++}
+  sh.merge(R,2,R,LAST,m.legend,mergeStyle(S.meta,{align:{wrap:1}}));sh.h(R,26);R++;
   sh.row=R;blockEnd(b0);
   /* zones */
   m.zones.forEach(function(z){
     var b=blockStart();R=sh.row;
-    sh.style(R,FIRST,R,LAST,S.cabin);sh.merge(R,FIRST,R,9,z.title,S.zoneTitle);
-    sh.merge(R,11,R,12,'ที่นั่งว่าง '+z.free,z.free?S.badge:S.badgeZero);sh.h(R,20);R++;
+    sh.style(R,FIRST,R,LAST,S.cabin);sh.merge(R,FIRST,R,12,z.title,S.zoneTitle);
+    sh.merge(R,13,R,15,'ที่นั่งว่าง '+z.free,z.free?S.badge:S.badgeZero);sh.h(R,20);R++;
     sh.style(R,FIRST,R,LAST,S.cabin);sh.h(R,5);R++;
     var run=null;
-    function endRun(){if(run){sh.box(run[0],3,R-1,12,'medium',C.crew);run=null}}
+    function endRun(){if(run){sh.box(run[0],INNER[0],R-1,INNER[1],'medium',C.crew);run=null}}
     z.items.forEach(function(it){
-      if(it.crew&&!run){sh.style(R,FIRST,R,LAST,S.cabin);sh.merge(R,3,R,12,'CREW ZONE',{font:{b:1,sz:13,color:C.crew},fill:C.crewSoft,align:{h:'center'}});sh.h(R,20);run=[R];R++}
+      if(it.crew&&!run){sh.style(R,FIRST,R,LAST,S.cabin);sh.merge(R,INNER[0],R,INNER[1],'CREW ZONE',{font:{b:1,sz:13,color:C.crew},fill:C.crewSoft,align:{h:'center'}});sh.h(R,20);run=[R];R++}
       if(!it.crew)endRun();
-      if(it.type==='ovh'||it.type==='deco'){
+      if(it.type==='ovh'){
         sh.style(R,FIRST,R,LAST,S.cabin);
-        (it.type==='ovh'?it.mon:it.text).forEach(function(mv,gi){if(mv==null||mv==='')return;var sp=sideSpan(gi);
-          if(it.type==='ovh')sh.merge(R,sp[0],R,sp[1],it.label,{font:{b:1,sz:7,color:mv===2?C.white:C.ink},fill:MONC[mv|0],align:{h:'center'}});
-          else sh.merge(R,sp[0],R,sp[1],mv,DECO)});
+        it.mon.forEach(function(mv,gi){if(mv==null)return;var sp=place(gi,[{w:it.w}])[0];
+          sh.merge(R,sp[0],R,sp[1],it.label,{font:{b:1,sz:7,color:mv===2?C.white:C.ink},fill:MONC[mv|0],align:{h:'center'},
+            border:{l:['thin',C.line],r:['thin',C.line],t:['thin',C.line],b:['thin',C.line]}})});
         sh.h(R,13);R++;return;
+      }
+      if(it.type==='deco'){
+        sh.style(R,FIRST,R,LAST,S.cabin);
+        it.parts.forEach(function(d,gi){if(!d)return;var sp=place(gi,[{w:d.w}])[0];sh.merge(R,sp[0],R,sp[1],d.t,DECO)});
+        sh.h(R,16);R++;sh.style(R,FIRST,R,LAST,S.cabin);sh.h(R,4);R++;return;
       }
       sh.style(R,FIRST,R+1,LAST,S.cabin);
       sh.merge(R,2,R+1,2,it.n,S.rowno);
-      it.groups.forEach(function(g,gi){
-        if(g&&g.deco){var sp=sideSpan(gi);sh.merge(R,sp[0],R+1,sp[1],g.deco,DECO);return}
-        var cols=groupCols(gi,g.length);
-        if(gi===0&&it.cap){cols=[SIDE[0][0]];sh.merge(R,SIDE[0][1],R+1,SIDE[0][2],it.cap,{font:{b:1,sz:8,color:C.muted},fill:C.cabin,align:{h:'left',v:'center',wrap:1}})}
-        g.forEach(function(seat,i){if(seat&&cols[i])seatCells(sh,R,cols[i],seat,blank)})});
+      it.sides.forEach(function(parts,gi){
+        place(gi,parts).forEach(function(cc,k){var p=parts[k];
+          if(p.deco){var end=R+3*(p.rows||1)-2;sh.merge(R,cc[0],end,cc[1],p.deco,DECO);return}
+          if(p.seat)seatCells(sh,R,cc[0],cc[1],p.seat,blank)})});
       sh.h(R,15);sh.h(R+1,26);R+=2;
       sh.style(R,FIRST,R,LAST,S.cabin);sh.h(R,4);R++;
     });
@@ -144,11 +150,11 @@ function build(m){
   });
   /* list */
   var CH=32,list=m.list,rows=blank?Array.apply(null,Array(m.blankRows||30)).map(function(){return null}):list;
-  var cols=[[2,3,'ที่นั่ง'],[4,6,'โซน'],[7,9,'ยศ ชื่อ-สกุล (ไทย)'],[10,13,'RANK NAME (EN)']];
-  if(!rows.length){var b1=blockStart();R=sh.row;sh.merge(R,2,R,13,m.listTitle,S.h2);sh.h(R,20);R++;sh.merge(R,2,R,13,'ยังไม่มีรายชื่อ',S.meta);R++;sh.row=R;blockEnd(b1)}
+  var cols=[[2,2,'ที่นั่ง'],[3,6,'โซน'],[7,9,'ยศ ชื่อ-สกุล (ไทย)'],[10,16,'RANK NAME (EN)']];
+  if(!rows.length){var b1=blockStart();R=sh.row;sh.merge(R,2,R,LAST,m.listTitle,S.h2);sh.h(R,20);R++;sh.merge(R,2,R,LAST,'ยังไม่มีรายชื่อ',S.meta);R++;sh.row=R;blockEnd(b1)}
   for(var i=0;i<rows.length;i+=CH){
     var bb=blockStart();R=sh.row;
-    sh.merge(R,2,R,13,m.listTitle+(blank?'':' ('+list.length+' คน)')+(i?' ต่อ':''),S.h2);sh.h(R,20);R++;
+    sh.merge(R,2,R,LAST,m.listTitle+(blank?'':' ('+list.length+' คน)')+(i?' ต่อ':''),S.h2);sh.h(R,20);R++;
     cols.forEach(function(c){sh.merge(R,c[0],R,c[1],c[2],S.th)});sh.h(R,16);R++;
     rows.slice(i,i+CH).forEach(function(p){
       var v=p?[p.id,p.zone,p.th,p.en]:['','','',''];
@@ -189,7 +195,7 @@ function toXlsx(sh,m){
   var cols='<cols>'+COLS.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'}).join('')+'</cols>';
   var sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-    '<dimension ref="A1:M'+maxR+'"/><sheetViews><sheetView workbookViewId="0" showGridLines="0" zoomScale="100" view="pageBreakPreview" zoomScaleSheetLayoutView="100"/></sheetViews>'+
+    '<dimension ref="A1:'+LASTCOL+maxR+'"/><sheetViews><sheetView workbookViewId="0" showGridLines="0" zoomScale="100" view="pageBreakPreview" zoomScaleSheetLayoutView="100"/></sheetViews>'+
     '<sheetFormatPr defaultRowHeight="15"/>'+cols+'<sheetData>'+rowsXml+'</sheetData>'+
     (sh.merges.length?'<mergeCells count="'+sh.merges.length+'">'+sh.merges.map(function(x){return '<mergeCell ref="'+x+'"/>'}).join('')+'</mergeCells>':'')+
     '<printOptions horizontalCentered="1"/><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'+
@@ -200,7 +206,7 @@ function toXlsx(sh,m){
   var sheetName=m.sheetName||'Seat Plan';
   var wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
     '<bookViews><workbookView/></bookViews><sheets><sheet name="'+esc(sheetName)+'" sheetId="1" r:id="rId1"/></sheets>'+
-    '<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">\''+esc(sheetName.replace(/'/g,"''"))+'\'!$A$1:$M$'+maxR+'</definedName></definedNames></workbook>';
+    '<definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">\''+esc(sheetName.replace(/'/g,"''"))+'\'!$A$1:$'+LASTCOL+'$'+maxR+'</definedName></definedNames></workbook>';
   var zip=new window.JSZip();
   zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+
