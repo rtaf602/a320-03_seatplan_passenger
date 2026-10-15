@@ -112,14 +112,13 @@ function seatList_() {
 }
 const ROWS = ['1', '2', '3', '5', '6', '7', '8', '9', '10', '11', '12', '14', '15', '16', '17', '18'];
 const SEAT_ROW = (function () { const o = {}; seatList_().forEach(function (s) { o[s[0]] = s[2]; }); return o; })();
-// CREW ZONE: แถว 1 (Front Crew Zone) เป็นของลูกเรือเสมอ
+// CREW ZONE: ADMIN เลือกเอง (ค่าเริ่มต้นไม่กั้น)
 //   หัวเครื่อง = กั้นเพิ่มจากแถว 1 ถึงแถวที่เลือก, ท้ายเครื่อง = แถวที่เลือกถึงแถวสุดท้าย
 function crewRows_(c) {
   const set = {}, fi = ROWS.indexOf(String(c.front || '')), ri = ROWS.indexOf(String(c.rear || ''));
   let i;
-  set[ROWS[0]] = 1;
-  if (fi > 0) for (i = 1; i <= fi; i++) set[ROWS[i]] = 1;
-  if (ri > 0) for (i = ri; i < ROWS.length; i++) set[ROWS[i]] = 1;
+  if (fi >= 0) for (i = 0; i <= fi; i++) set[ROWS[i]] = 1;
+  if (ri >= 0) for (i = ri; i < ROWS.length; i++) set[ROWS[i]] = 1;
   return set;
 }
 
@@ -701,10 +700,10 @@ function opAdminSave_(ctx, b) {
     // กั้นที่นั่งลูกเรือ
     if (b.crew) {
       const nc = { front: clean_(b.crew.front, 4), rear: clean_(b.crew.rear, 4) };
-      if (nc.front && ROWS.indexOf(nc.front) < 1) nc.front = '';
-      if (nc.rear && ROWS.indexOf(nc.rear) < 1) nc.rear = '';
+      if (nc.front && ROWS.indexOf(nc.front) < 0) nc.front = '';
+      if (nc.rear && ROWS.indexOf(nc.rear) < 0) nc.rear = '';
       const fi = ROWS.indexOf(nc.front), ri = ROWS.indexOf(nc.rear);
-      if (fi > 0 && ri > 0 && fi >= ri) throw err_('bad_request', 'กั้นจากหัวเครื่องและท้ายเครื่องซ้อนกัน');
+      if (fi >= 0 && ri >= 0 && fi >= ri) throw err_('bad_request', 'กั้นจากหัวเครื่องและท้ายเครื่องซ้อนกัน');
       [['front', CREW_FRONT_ROW, 'หัวเครื่อง'], ['rear', CREW_REAR_ROW, 'ท้ายเครื่อง']].forEach(function (c) {
         if (nc[c[0]] === cur.crew[c[0]]) return;
         m.sh.getRange(c[1], 2).setValue(nc[c[0]]);

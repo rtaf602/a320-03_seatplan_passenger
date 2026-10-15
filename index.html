@@ -6,9 +6,9 @@
 <title>A320-03 Passenger Seat Plan</title>
 <link rel="icon" href="emblem.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Barlow+Semi+Condensed:wght@400;500;600&family=Sarabun:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css?v=2610160300">
-<link rel="stylesheet" href="boardingpass.css?v=2610160300">
-<script src="config.js?v=2610160300"></script>
+<link rel="stylesheet" href="app.css?v=2610160310">
+<link rel="stylesheet" href="boardingpass.css?v=2610160310">
+<script src="config.js?v=2610160310"></script>
 </head>
 <body>
 
@@ -96,7 +96,7 @@
       <label class="f"><span>จากหัวเครื่อง ถึงแถว</span><select id="crewFront"></select></label>
       <label class="f"><span>จากท้ายเครื่อง ถึงแถว</span><select id="crewRear"></select></label>
     </div>
-    <p class="hint left">แถว 1 (Front Crew Zone) เป็น CREW ZONE เสมอ เลือกกั้นเพิ่มได้ โซนที่กั้นขึ้น <b class="red">CREW ZONE</b> ผู้โดยสารกรอกไม่ได้ และหักออกจากจำนวนที่นั่งว่าง แตะที่นั่งใน CREW ZONE เพื่อกรอกข้อมูลลูกเรือ เปลี่ยนแล้วกด SAVE</p>
+    <p class="hint left">ค่าเริ่มต้นไม่กั้น เลือก “จากหัวเครื่อง ถึงแถว” เพื่อกั้นตั้งแต่แถว 1 (Front Crew Zone) ถึงแถวที่เลือก โซนที่กั้นขึ้น <b class="red">CREW ZONE</b> ผู้โดยสารกรอกไม่ได้ และหักออกจากจำนวนที่นั่งว่าง แตะที่นั่งใน CREW ZONE เพื่อกรอกข้อมูลลูกเรือ เปลี่ยนแล้วกด SAVE</p>
   </section>
 
   <div class="legend" id="legend">
@@ -104,7 +104,7 @@
     <span><i class="sw sw-occ"></i>มีผู้โดยสาร</span>
     <span><i class="sw sw-warn"></i>ที่นั่งขัดข้องแต่ใช้ได้ (!)</span>
     <span><i class="sw sw-bad"></i>ที่นั่งใช้ไม่ได้ (×)</span>
-    <span><i class="sw sw-crew"></i>CREW ZONE (แถว 1 เป็นของลูกเรือเสมอ)</span>
+    <span><i class="sw sw-crew"></i>CREW ZONE</span>
     <span><i class="sw mon" style="background:var(--mon-wall);width:28px;height:12px"></i>Monitor = จอติดผนัง 21.5"</span>
     <span><i class="sw mon" style="background:var(--ovh-ok);width:28px;height:12px;border-radius:999px"></i>OVHD = จอพับเหนือที่นั่ง 12.0"</span>
     <span><i class="sw mon" style="background:var(--warn);width:14px;height:12px"></i><i class="sw mon" style="background:var(--bad);width:14px;height:12px"></i>จอเสื่อม · จอเสีย (ขีดล่าง = มีหมายเหตุ)</span>
@@ -278,8 +278,8 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="excel.js?v=2610160300"></script>
-<script src="boardingpass.js?v=2610160300"></script>
-<script src="app.js?v=2610160300"></script>
+<script src="excel.js?v=2610160310"></script>
+<script src="boardingpass.js?v=2610160310"></script>
+<script src="app.js?v=2610160310"></script>
 </body>
 </html>

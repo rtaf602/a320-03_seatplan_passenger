@@ -34,7 +34,7 @@ var LR=['L','R'],BIN_ROWS=[10,12,15,17];
 function monPair(pos,sides,ovhd){return {mon:LR.map(function(x){return (sides||'LR').indexOf(x)>=0?'MON-'+pos+'-'+x:null}),ovhd:!!ovhd}}
 function seatRow(n,L,R){return {n:n,L:L.split(''),R:R.split('')}}
 var ZONES=[
- {key:'CR',name:'FRONT CREW ZONE',title:'Front Crew Zone',fixed:true,lines:[
+ {key:'CR',name:'FRONT CREW ZONE',title:'Front Crew Zone',lines:[
    {n:1,room:{name:'ห้อง Commander Center',mon:'MON-B1-L',seat:'A',w:2,label:'Commander Center 1A'},R:{mon:'MON-B1-R',seats:['D','_','F']}}]},
  {key:'OA',name:'VVIP OA',title:'VVIP OA',lines:[monPair('B2','L'),{L2:[[2,'A'],[3,'A']],sofa:'SOFA'},monPair('A3')]},
  {key:'OB',name:'VIP OB',title:'VIP OB',lines:[monPair('B5'),seatRow(5,'B','DF'),{tables:[1,2]},seatRow(6,'B','DF'),monPair('A6')]},
@@ -115,11 +115,10 @@ function pending(mode){mode=mode||view;if(!D)return {info:[],pax:[],crew:false,c
   var info=INFO_KEYS.filter(function(k){return k in D.info}),pax=SEATS.filter(function(id){return D.pax[id]});
   return {info:info,pax:pax,crew:false,crewPax:[],n:info.length+pax.length}}
 
-/* crew zone: row 1 (Front Crew Zone) is always crew; front = row 1 .. chosen row, rear = chosen row .. last row */
+/* crew zone (chosen on the ADMIN page, nothing blocked by default): front = row 1 .. chosen row, rear = chosen row .. last row */
 function crewRows(c){var set={},fi=ROWS.indexOf(c.front),ri=ROWS.indexOf(c.rear),i;
-  set[ROWS[0]]=1;
-  if(fi>0)for(i=1;i<=fi;i++)set[ROWS[i]]=1;
-  if(ri>0)for(i=ri;i<ROWS.length;i++)set[ROWS[i]]=1;
+  if(fi>=0)for(i=0;i<=fi;i++)set[ROWS[i]]=1;
+  if(ri>=0)for(i=ri;i<ROWS.length;i++)set[ROWS[i]]=1;
   return set}
 function isCrew(id,set){return !!(set||crewRows(getCrew()))[SEAT[id].row]}
 
@@ -515,7 +514,7 @@ function buildZones(host,report,mode){
     bd.title='ที่นั่งว่างสำหรับผู้โดยสาร '+v.free+' ที่นั่ง (ไม่นับที่นั่งที่มีชื่อแล้ว ที่นั่งใช้ไม่ได้ และ CREW ZONE)';h.appendChild(bd);sec.appendChild(h);
     var box=el('div','rows'),cbox=null;
     function put(row,keys){
-      if(keys.some(function(k){return crew[k]})){if(!cbox){cbox=el('div','crewbox');cbox.appendChild(el('div','crewlbl',z.fixed?'CREW ZONE · ลูกเรือ':'CREW ZONE'));box.appendChild(cbox)}cbox.appendChild(row)}
+      if(keys.some(function(k){return crew[k]})){if(!cbox){cbox=el('div','crewbox');cbox.appendChild(el('div','crewlbl','CREW ZONE'));box.appendChild(cbox)}cbox.appendChild(row)}
       else{cbox=null;box.appendChild(row)}
     }
     var lastRow='';
@@ -867,9 +866,9 @@ $('pvXls').addEventListener('click',function(){askExcel(pvMode)});
 
 /* ----- ADMIN ----- */
 (function(){var f=$('crewFront'),r=$('crewRear');
-  f.appendChild(new Option('เฉพาะแถว 1 (Front Crew Zone)',''));r.appendChild(new Option('ไม่กั้น',''));
+  f.appendChild(new Option('ไม่กั้น',''));r.appendChild(new Option('ไม่กั้น',''));
   function lbl(k){return 'แถว '+k+'  ('+zoneOf(SEAT[SEATS.filter(function(s){return SEAT[s].row===k})[0]].zone).title+')'}
-  ROWS.forEach(function(k,i){if(i)f.appendChild(new Option(lbl(k),k))});
+  ROWS.forEach(function(k){f.appendChild(new Option(lbl(k),k))});
   ROWS.slice().reverse().forEach(function(k,i){if(i<ROWS.length-1)r.appendChild(new Option(lbl(k),k))});
 })();
 function renderAdmin(){var c=getCrew();$('crewFront').value=c.front;$('crewRear').value=c.rear;
@@ -895,7 +894,7 @@ function changeCrew(){
   if(closed())return;
   var nc={front:$('crewFront').value,rear:$('crewRear').value};
   var fi=ROWS.indexOf(nc.front),ri=ROWS.indexOf(nc.rear);
-  if(fi>0&&ri>0&&fi>=ri){toast('กั้นจากหัวเครื่องและท้ายเครื่องซ้อนกัน เลือกแถวใหม่',true);renderAdmin();return}
+  if(fi>=0&&ri>=0&&fi>=ri){toast('กั้นจากหัวเครื่องและท้ายเครื่องซ้อนกัน เลือกแถวใหม่',true);renderAdmin();return}
   var set=crewRows(nc),hit=SEATS.filter(function(id){return set[SEAT[id].row]&&M.pax[id]&&!isEmpty(M.pax[id])});
   function apply(){D.crew=nc;cleanDraft();persistDraft();renderAll();toast('ตั้ง CREW ZONE แล้ว กด SAVE เพื่อบันทึก')}
   if(hit.length)ask('มีผู้โดยสารในแถวที่จะกั้น','ที่นั่ง '+hit.join(', ')+' มีรายชื่อผู้โดยสารอยู่ เมื่อกด SAVE รายชื่อในที่นั่งเหล่านี้จะถูกล้างออก','กั้นที่นั่ง',apply,renderAdmin);
