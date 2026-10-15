@@ -21,34 +21,33 @@ function rawApi(body){
 }
 function api(body){body.s=sess;return rawApi(body)}
 
-/* ---------- aircraft layout (nose to tail) — ขนาดตามไฟล์ Seat Plan 320(03) (For Admin) ----------
- * หน่วยวัด = ความกว้าง 1 ที่นั่ง (ในชีท 84 px) · แต่ละฝั่งกว้าง 3 ที่นั่ง · ทางเดินกว้าง 1.5 ที่นั่ง
- * row item  {n, g:[left, right]}  each side is one of:
- *           'ABC' / 'D_F' / 'BC'  seats (1 seat wide each, '_' = empty seat position), centred in the side
- *           {seat:'A', w:2, cap}  one wide seat (Commander Center 1A = 2 seats wide)
- *           {t:'SOFA', w:3, rows:2}  furniture w seats wide, covering `rows` seat rows
- *           ''  nothing
- * monitor   {mon:'B9'|'A3', sides, ovhd}  2 seats wide, centred · B = in front of row, A = behind row (end of zone)
- * deco      {deco:[{t:'TABLE',w:1},{t:'TABLE',w:2}]}  furniture row between seat rows (one entry per side) */
-var GW=3,AIRCRAFT='A320-03',ADMIN_FILE='Seat Plan 320(03) (For Admin)';
-var LR=['L','R'],ABC=['ABC','DEF'],MON_W=2;
-function rows(nums,g){return nums.map(function(n){return {n:n,g:g}})}
-function mon(pos,sides,ovhd){return {mon:pos,sides:sides||LR,ovhd:!!ovhd}}
+/* ---------- aircraft layout (nose to tail) — แบบเดียวกับเว็บ STATUS SEAT PLAN A320(03) (rtaf602/a320-03_seatplan)
+ * line types:
+ *   {mon:[left id|null, right id|null], ovhd}   Monitor row (Wall = small tag, OVHD = full-width pill)
+ *   {n, L:[letters], R:[letters]}               seat row; letters side by side, centred in the side ('_' = empty place, Excel only)
+ *   {n, room:{name, mon, seat}, R:{mon, seats}} Front Crew Zone: ห้อง Commander Center (Monitor + wide seat 1A), 1D 1F with their Monitor
+ *   {L2:[[n,letter],...], sofa}                 seats stacked on the left (2A, 3A) beside the SOFA
+ *   {tables:[left width, right width]}          TABLE between rows (width in seats)
+ * Monitor ids are the same as the server reads from the For Admin file: MON-B<row> = in front of the row, MON-A<row> = behind it. */
+var AIRCRAFT='A320-03',ADMIN_FILE='Seat Plan 320(03) (For Admin)';
+var LR=['L','R'],BIN_ROWS=[10,12,15,17];
+function monPair(pos,sides,ovhd){return {mon:LR.map(function(x){return (sides||'LR').indexOf(x)>=0?'MON-'+pos+'-'+x:null}),ovhd:!!ovhd}}
+function seatRow(n,L,R){return {n:n,L:L.split(''),R:R.split('')}}
 var ZONES=[
- {key:'CR',name:'FRONT CREW ZONE',title:'Front Crew Zone',fixed:true,items:[mon('B1'),{n:1,g:[{seat:'A',w:2,cap:'Commander Center'},'D_F']}]},
- {key:'OA',name:'VVIP OA',title:'VVIP OA',items:[mon('B2',['L']),{n:2,g:['A',{t:'SOFA',w:3,rows:2}]},{n:3,g:['A','']},mon('A3')]},
- {key:'OB',name:'VIP OB',title:'VIP OB',items:[mon('B5'),{n:5,g:['B','DF']},{deco:[{t:'TABLE',w:1},{t:'TABLE',w:2}]},{n:6,g:['B','DF']},mon('A6')]},
- {key:'OC',name:'VVIP OC',title:'VVIP OC',items:[mon('B7')].concat(rows([7,8],['BC','DF']),[mon('A8')])},
- {key:'OD',name:'PASSENGER OD',title:'Passenger OD',items:[mon('B9')].concat(rows([9],ABC),[mon('B10',LR,1)],rows([10,11],ABC),[mon('B12',LR,1)],
-   rows([12,14],ABC),[mon('B15',LR,1)],rows([15,16],ABC),[mon('B17',LR,1)],rows([17,18],ABC))}
+ {key:'CR',name:'FRONT CREW ZONE',title:'Front Crew Zone',fixed:true,lines:[
+   {n:1,room:{name:'ห้อง Commander Center',mon:'MON-B1-L',seat:'A',w:2,label:'Commander Center 1A'},R:{mon:'MON-B1-R',seats:['D','_','F']}}]},
+ {key:'OA',name:'VVIP OA',title:'VVIP OA',lines:[monPair('B2','L'),{L2:[[2,'A'],[3,'A']],sofa:'SOFA'},monPair('A3')]},
+ {key:'OB',name:'VIP OB',title:'VIP OB',lines:[monPair('B5'),seatRow(5,'B','DF'),{tables:[1,2]},seatRow(6,'B','DF'),monPair('A6')]},
+ {key:'OC',name:'VVIP OC',title:'VVIP OC',lines:[monPair('B7'),seatRow(7,'BC','DF'),seatRow(8,'BC','DF'),monPair('A8')]},
+ {key:'OD',name:'PASSENGER OD',title:'Passenger OD',lines:[monPair('B9')].concat([].concat.apply([],[9,10,11,12,14,15,16,17,18].map(function(n){
+   var r=seatRow(n,'ABC','DEF');return BIN_ROWS.indexOf(n)>=0?[monPair('B'+n,'LR',true),r]:[r]})))}
 ];
 var SEATS=[],SEAT={},ROWS=[];
-ZONES.forEach(function(z){z.items.forEach(function(it){
-  if(it.n==null)return;
-  ROWS.push(String(it.n));
-  it.g.forEach(function(grp){
-    var ls=typeof grp==='string'?grp.replace(/_/g,'').split(''):(grp.seat?[grp.seat]:[]);
-    ls.forEach(function(L){var id=it.n+L;SEATS.push(id);SEAT[id]={zone:z.key,row:String(it.n),mon:false,w:grp.w||1,cap:grp.cap||''}})});
+function addSeat(z,n,L,extra){var id=n+L;SEATS.push(id);SEAT[id]={zone:z.key,row:String(n),mon:false,w:(extra&&extra.w)||1,label:(extra&&extra.label)||''}}
+ZONES.forEach(function(z){z.lines.forEach(function(ln){
+  if(ln.room){ROWS.push(String(ln.n));addSeat(z,ln.n,ln.room.seat,ln.room);ln.R.seats.forEach(function(L){if(L!=='_')addSeat(z,ln.n,L)});return}
+  if(ln.L2){ln.L2.forEach(function(x){ROWS.push(String(x[0]));addSeat(z,x[0],x[1])});return}
+  if(ln.n!=null){ROWS.push(String(ln.n));ln.L.concat(ln.R).forEach(function(L){if(L!=='_')addSeat(z,ln.n,L)})}
 })});
 /* label for a seat: 1A is the Commander Center */
 function seatName(id){return id==='1A'?'Commander Center 1A':'ที่นั่ง '+id}
@@ -483,12 +482,10 @@ infoInputs.forEach(function(inp){
 function seatBtn(id,text,mon,ctx){
   var b=el('button','seat');b.type='button';b.dataset.id=id;
   var w=SEAT[id].w||1;if(w>1){b.classList.add('wide');b.style.width=span(w)}
-  if(mon)b.appendChild(el('span','m'));
-  var s=el('span','s');s.appendChild(el('span','lt',text));b.appendChild(s);
+  var s=el('span','s');s.appendChild(el('span','lt',SEAT[id].label||id));b.appendChild(s);
   var st=status(id),crew=isCrew(id,ctx.crew),p=crew?(ctx.mode==='crew'?getCrewPax(id):null):getPax(id);
   b.dataset.s=st.s;if(mon)b.dataset.m=st.m;
   if(p){b.classList.add('occ');s.appendChild(el('span','nm',shortName(p)))}
-  else if(SEAT[id].cap)s.appendChild(el('span','cap',SEAT[id].cap));
   if(crew)b.classList.add('crew');
   if(crew&&ctx.mode==='crew')b.classList.add('crewedit');
   if(!ctx.report&&((ctx.mode==='crew'&&crewPending(id))||(ctx.mode!=='crew'&&paxPending(id))))b.dataset.pending='1';
@@ -500,11 +497,15 @@ function seatBtn(id,text,mon,ctx){
   return b;
 }
 var MON_NAME=['จอปกติ','จอเสื่อม','จอเสีย'];
-/* width of w seats (with the small gaps between them) */
+/* width of w seats (with the gaps between them) */
 function span(w){return 'calc('+w+' * var(--sw) + '+(w-1)+' * var(--sg))'}
-function grpBox(){var g=el('div','grp');g.style.width=span(GW);return g}
-function decoEl(d){var x=el('span','deco'+(d.rows>1?' span'+d.rows:''),d.t);x.style.width=span(d.w);
-  if(d.rows>1)x.style.left='calc('+(GW-d.w)/2+' * (var(--sw) + var(--sg)))';return x}
+function sideEl(cls){return el('div','side'+(cls?' '+cls:''))}
+function monEl(id,ovhd){
+  var st=status(id),txt=ovhd?'OVHD':'Monitor',b=el('span','ovh'+(ovhd?' bin':''),txt);b.dataset.m=st.m;
+  var pos=/^MON-([AB])(\d+)-([LR])$/.exec(id)||[];
+  b.title=(ovhd?'OVHD Monitor 12.0"':'Monitor 21.5"')+' · '+(pos[1]==='B'?'หน้าแถว ':'หลังแถว ')+pos[2]+' ('+(pos[3]==='L'?'ซ้าย':'ขวา')+') · '+MON_NAME[st.m]+(st.note?' · '+st.note:'');
+  if(st.note)b.dataset.note='1';
+  return b}
 function buildZones(host,report,mode){
   host.textContent='';var crew=crewRows(getCrew()),stats=zoneStats(),ctx={crew:crew,report:report,mode:mode};
   ZONES.forEach(function(z){
@@ -513,39 +514,40 @@ function buildZones(host,report,mode){
     var bd=el('span','badge'+(v.free?'':' zero'));bd.append('ที่นั่งว่าง ');bd.appendChild(el('b',null,String(v.free)));
     bd.title='ที่นั่งว่างสำหรับผู้โดยสาร '+v.free+' ที่นั่ง (ไม่นับที่นั่งที่มีชื่อแล้ว ที่นั่งใช้ไม่ได้ และ CREW ZONE)';h.appendChild(bd);sec.appendChild(h);
     var box=el('div','rows'),cbox=null;
-    function put(row,key){
-      if(crew[key]){if(!cbox){cbox=el('div','crewbox');cbox.appendChild(el('div','crewlbl',z.fixed?'CREW ZONE · ลูกเรือ':'CREW ZONE'));box.appendChild(cbox)}cbox.appendChild(row)}
+    function put(row,keys){
+      if(keys.some(function(k){return crew[k]})){if(!cbox){cbox=el('div','crewbox');cbox.appendChild(el('div','crewlbl',z.fixed?'CREW ZONE · ลูกเรือ':'CREW ZONE'));box.appendChild(cbox)}cbox.appendChild(row)}
       else{cbox=null;box.appendChild(row)}
     }
     var lastRow='';
-    z.items.forEach(function(it){
-      if(it.mon){
-        var o=el('div','row ovhrow');o.appendChild(el('div','rowno'));
-        LR.forEach(function(side,i){if(i)o.appendChild(el('div','aisle'));
-          var g=grpBox();
-          if(it.sides.indexOf(side)>=0){
-            var id='MON-'+it.mon+'-'+side,st=status(id),txt=it.ovhd?'OVHD Monitor':'Monitor';
-            var b=el('span','ovh'+(it.ovhd?' ovhd':''),txt);b.dataset.m=st.m;b.style.width=span(MON_W);
-            b.title=txt+(it.ovhd?' 12.0"':' 21.5"')+' '+(it.mon.charAt(0)==='B'?'หน้าแถว ':'หลังแถว ')+it.mon.slice(1)+' ('+(side==='L'?'ซ้าย':'ขวา')+') · '+MON_NAME[st.m]+(st.note?' · '+st.note:'');
-            g.appendChild(b)}
-          o.appendChild(g)});
-        put(o,it.mon.slice(1));return;
+    z.lines.forEach(function(ln,li){
+      var r=el('div','row');
+      if(ln.mon){
+        r.classList.add('ovhrow');
+        ln.mon.forEach(function(id,i){if(i)r.appendChild(el('div','aisle'));var sd=sideEl();if(id)sd.appendChild(monEl(id,ln.ovhd));r.appendChild(sd)});
+        /* a Monitor belongs with the row it faces: in front of the next seat row, or behind the last one */
+        var nx=z.lines.slice(li+1).filter(function(x){return x.n!=null||x.L2})[0];
+        put(r,[ln.mon.filter(Boolean)[0].indexOf('MON-A')===0||!nx?lastRow:String(nx.n!=null?nx.n:nx.L2[0][0])]);return;
       }
-      if(it.deco){
-        var d=el('div','row decorow');d.appendChild(el('div','rowno'));
-        it.deco.forEach(function(x,i){if(i)d.appendChild(el('div','aisle'));var g=grpBox();if(x)g.appendChild(decoEl(x));d.appendChild(g)});
-        put(d,lastRow);return;
+      if(ln.tables){
+        ln.tables.forEach(function(w,i){if(i)r.appendChild(el('div','aisle'));var sd=sideEl(),t=el('div','tbl','TABLE');t.style.width=span(w);sd.appendChild(t);r.appendChild(sd)});
+        put(r,[lastRow]);return;
       }
-      var key=String(it.n);lastRow=key;
-      var r2=el('div','row');r2.appendChild(el('div','rowno',key));
-      it.g.forEach(function(grp,gi){
-        if(gi)r2.appendChild(el('div','aisle'));
-        var g=grpBox();
-        if(typeof grp==='string')grp.split('').forEach(function(L){if(L==='_'){g.appendChild(el('div','gap'));return}g.appendChild(seatBtn(it.n+L,L,false,ctx))});
-        else if(grp.seat)g.appendChild(seatBtn(it.n+grp.seat,it.n+grp.seat,false,ctx));
-        else{g.classList.add('top');g.appendChild(decoEl(grp))}
-        r2.appendChild(g)});
-      put(r2,key);
+      if(ln.room){
+        var ls=sideEl(),room=el('div','room');room.appendChild(el('div','roomname',ln.room.name));
+        room.appendChild(monEl(ln.room.mon,false));room.appendChild(seatBtn(ln.n+ln.room.seat,null,false,ctx));ls.appendChild(room);
+        var rs=sideEl('col');rs.appendChild(monEl(ln.R.mon,false));
+        var sr=el('div','seatrow');ln.R.seats.forEach(function(L){if(L!=='_')sr.appendChild(seatBtn(ln.n+L,null,false,ctx))});rs.appendChild(sr);
+        r.appendChild(ls);r.appendChild(el('div','aisle'));r.appendChild(rs);lastRow=String(ln.n);put(r,[lastRow]);return;
+      }
+      if(ln.L2){
+        var left=sideEl(),col=el('div','stack');ln.L2.forEach(function(x){col.appendChild(seatBtn(x[0]+x[1],null,false,ctx))});left.appendChild(col);
+        var right=sideEl('stretch');right.appendChild(el('div','sofa',ln.sofa));
+        r.appendChild(left);r.appendChild(el('div','aisle'));r.appendChild(right);
+        var ks=ln.L2.map(function(x){return String(x[0])});lastRow=ks[ks.length-1];put(r,ks);return;
+      }
+      [ln.L,ln.R].forEach(function(ls2,i){if(i)r.appendChild(el('div','aisle'));var sd=sideEl();
+        ls2.forEach(function(L){if(L==='_')sd.appendChild(el('div','gap'));else sd.appendChild(seatBtn(ln.n+L,null,false,ctx))});r.appendChild(sd)});
+      lastRow=String(ln.n);put(r,[lastRow]);
     });
     sec.appendChild(box);host.appendChild(sec);
   });
@@ -807,20 +809,27 @@ function excelModel(mode,blank){
   var seatObj=function(id,label,mon){var st=status(id),crew=!!set[SEAT[id].row];
     var p=crew?(crewMode?getCrewPax(id):null):getPax(id);
     return {label:label,s:st.s,mon:mon?st.m:null,crew:crew,name:p?shortName(p):''}};
-  /* each side -> list of parts {w, seat|null|deco} (widths in seats, centred by excel.js) */
-  var side=function(n,g){
-    if(typeof g==='string')return g.split('').map(function(L){return {w:1,seat:L==='_'?null:seatObj(n+L,L,false)}});
-    if(g.seat)return [{w:g.w,seat:seatObj(n+g.seat,(g.cap?g.cap+' ':'')+n+g.seat,false)}];
-    return [{w:g.w,deco:g.t,rows:g.rows||1}];
-  };
-  var zones=ZONES.map(function(z){var v=stats[z.key],free=blank?(v.t-v.crew-v.bad):v.free,last='';
-    return {title:z.title,free:free,items:z.items.map(function(it){
-      if(it.mon)return {type:'ovh',crew:!!set[it.mon.slice(1)],label:it.ovhd?'OVHD Monitor':'Monitor',w:MON_W,
-        mon:LR.map(function(p){return it.sides.indexOf(p)<0?null:status('MON-'+it.mon+'-'+p).m})};
-      if(it.deco)return {type:'deco',crew:!!set[last],parts:it.deco};
-      last=String(it.n);
-      return {type:'row',n:last,crew:!!set[last],sides:it.g.map(function(g){return side(it.n,g)})};
-    })}});
+  /* Excel copies the Google Sheet grid (like the Excel of the A320(03) technician web):
+     each side -> list of parts {w (seats), seat|null|deco}, centred by excel.js */
+  var part=function(n,L,label,w){return {w:w||1,seat:L==='_'?null:seatObj(n+L,label||(n+L),false)}};
+  var monItem=function(ids,ovhd,crewKey){return {type:'ovh',crew:!!set[crewKey],label:ovhd?'OVHD 12.0"':'Monitor 21.5"',ovhd:ovhd,w:2,
+    mon:ids.map(function(id){return id?status(id).m:null})}};
+  var zones=ZONES.map(function(z){var v=stats[z.key],free=blank?(v.t-v.crew-v.bad):v.free,items=[],last='';
+    z.lines.forEach(function(ln,li){
+      if(ln.mon){var nx=z.lines.slice(li+1).filter(function(x){return x.n!=null||x.L2})[0];
+        items.push(monItem(ln.mon,ln.ovhd,ln.mon.filter(Boolean)[0].indexOf('MON-A')===0||!nx?last:String(nx.n!=null?nx.n:nx.L2[0][0])));return}
+      if(ln.tables){items.push({type:'deco',crew:!!set[last],parts:ln.tables.map(function(w){return {t:'TABLE',w:w}})});return}
+      if(ln.room){last=String(ln.n);var c=!!set[last];
+        items.push({type:'room',crew:c,title:ln.room.name});
+        items.push(monItem([ln.room.mon,ln.R.mon],false,last));
+        items.push({type:'row',n:last,crew:c,sides:[[part(ln.n,ln.room.seat,ln.room.label,ln.room.w)],ln.R.seats.map(function(L){return part(ln.n,L)})]});
+        items.push({type:'roomEnd',crew:c});return}
+      if(ln.L2){ln.L2.forEach(function(x,i){last=String(x[0]);
+        items.push({type:'row',n:last,crew:!!set[last],sides:[[part(x[0],x[1])],i?[]:[{w:3,deco:ln.sofa,rows:ln.L2.length}]]})});return}
+      last=String(ln.n);
+      items.push({type:'row',n:last,crew:!!set[last],sides:[ln.L.map(function(L){return part(ln.n,L)}),ln.R.map(function(L){return part(ln.n,L)})]});
+    });
+    return {title:z.title,free:free,items:items}});
   var b=bkk(),ls=M.lastSave;
   var meta=['ออกรายงาน '+b.d+' '+MON[b.M-1]+' '+String(b.y).slice(2)+' / '+p2(b.h)+':'+p2(b.m)+' TH-LT',
     ls&&ls.at?'SAVE ล่าสุด '+[ls.by,fmtTH(ls.at)].filter(Boolean).join(' · '):'ยังไม่เคย SAVE','สภาพที่นั่ง/จอ ตามไฟล์ '+ADMIN_FILE].join('   ·   ');
@@ -831,7 +840,7 @@ function excelModel(mode,blank){
       [{label:'FLIGHT',val:getInfo('flight')},{label:'ROUTE',val:getInfo('route')},{label:'DATE',val:getInfo('date')},{label:'GATE',val:getInfo('gate')}],
       [{label:'BOARDING TIME',val:getInfo('time')}]],
     meta:meta,
-    legend:'สัญลักษณ์: ช่องสีฟ้า = มีชื่อแล้ว · ช่องแดงอ่อน × = ที่นั่งใช้ไม่ได้ · เส้นเหลืองหนาใต้ช่อง ! = ที่นั่งขัดข้องแต่ใช้ได้ · แถบ Monitor / OVHD Monitor สีเขียว เหลือง แดง = จอ ปกติ เสื่อม เสีย · กรอบแดง CREW ZONE = กันไว้ให้ลูกเรือ'+(blank?' · ช่องใต้ตัวอักษรที่นั่งไว้กรอกชื่อ':''),
+    legend:'สัญลักษณ์: ช่องสีฟ้า = มีชื่อแล้ว · ช่องแดงอ่อน × = ที่นั่งใช้ไม่ได้ · เส้นเหลืองหนาใต้ช่อง ! = ที่นั่งขัดข้องแต่ใช้ได้ · Monitor 21.5" สีเขียวอ่อน · OVHD 12.0" สีม่วง · สีเหลือง / แดง = จอเสื่อม / จอเสีย · กรอบแดง CREW ZONE = กันไว้ให้ลูกเรือ'+(blank?' · ช่องใต้ตัวอักษรที่นั่งไว้กรอกชื่อ':''),
     zones:zones,listTitle:crewMode?'รายชื่อลูกเรือ':'รายชื่อผู้โดยสาร',
     list:manifestRows(crewMode?'crew':'pax').map(function(r){return {id:r.id,zone:r.zone,th:thFull(r.p),en:enFull(r.p)}}),
     footer:[getInfo('flight'),getInfo('date'),'Seat Plan '+AIRCRAFT].filter(Boolean).join(' · ')

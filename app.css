@@ -313,27 +313,41 @@ dialog.wide[open]{display:flex;flex-direction:column}
 .nsec{margin:6px 0 8px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink)}
 #newDlg{width:min(560px,calc(100vw - 32px))}
 
-/* A320-03 — ขนาดตามไฟล์ Seat Plan 320(03) (For Admin): 1 ที่นั่ง = 84 px, ทางเดิน = 1.5 ที่นั่ง,
-   Monitor / OVHD = 2 ที่นั่ง, TABLE = 1 หรือ 2 ที่นั่ง, SOFA = 3 ที่นั่ง สูง 2 แถว, Commander Center 1A = 2 ที่นั่ง */
-.rows{--sw:clamp(30px,calc((100vw - 110px) / 7.5),84px);--sg:3px;--sh:44px;--rg:8px;gap:var(--rg)}
-.row{gap:6px}
-.aisle{width:calc(1.5 * var(--sw))}
-.grp{justify-content:center;align-items:flex-end}
-.grp.top{align-self:stretch;align-items:flex-start}
-.seat .s,.seat.occ .s{height:var(--sh);min-height:0}
-.seat.wide .s .lt{font-size:13px}
-.seat .cap{display:block;font-family:var(--sans);font-weight:600;font-size:9.5px;line-height:1.1;color:var(--muted);text-align:center;padding:0 2px}
-.ovhrow,.decorow{height:20px;align-items:center;margin-block:0}
-.ovhrow .rowno,.decorow .rowno{padding:0}
-.ovh{position:static;transform:none;display:block;box-sizing:border-box;height:18px;line-height:18px;padding:0;text-align:center;font-size:11px;border-radius:3px;overflow:hidden;white-space:nowrap}
-.ovh.ovhd{font-size:10px;height:16px;line-height:16px}
-.deco{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:20px;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);background:var(--line);border:1.5px solid var(--faint);border-radius:4px;flex:none}
-.grp.top{position:relative}
-.deco.span2{position:absolute;top:0;left:0;z-index:1;height:calc(2 * var(--sh) + var(--rg))}
-@media (max-width:600px){.row{gap:3px}.ovh,.ovh.ovhd{font-size:8.5px}.deco{font-size:9px;letter-spacing:.06em}.seat .cap{font-size:8px}}
-/* PREVIEW / PDF: ขนาดเท่าชีทจริง */
-.report .rows{--sw:84px;--sg:3px;--sh:46px;--rg:6px}
-.report .row{gap:6px}
-.report .aisle{width:calc(1.5 * var(--sw))}
-.report .seat .s{min-height:0}
-.report .seat .nm{font-size:9.5px}
+/* A320-03 — ขนาดและรูปแบบผังแบบเดียวกับเว็บ STATUS SEAT PLAN A320(03) (rtaf602/a320-03_seatplan)
+   ที่นั่ง 54 px สูง 40 px · ฝั่งละ 3 ที่นั่ง · Monitor = ป้ายเล็กสีเขียวอ่อน · OVHD = แถบม่วงเต็มฝั่ง
+   TABLE = กรอบเส้นประสูงเท่าที่นั่ง กว้าง 1 / 2 ที่นั่ง · SOFA = กรอบเส้นประกว้าง 2 ที่นั่ง ข้าง 2A 3A · ห้อง Commander Center */
+:root{--mon-wall:#8ed873;--ovh-ok:#b4a7d6;--room:rgba(255,255,255,.55);--on-status:#10202b}
+.rows{--sg:clamp(3px,1vw,8px);--sw:clamp(34px,calc((100vw - 120px) / 7),54px);--sh:40px;gap:8px}
+.row{gap:0;align-items:flex-end;justify-content:center}
+.rowno{display:none}
+.aisle{width:clamp(18px,6vw,56px);flex:none}
+.side{flex:none;display:flex;align-items:flex-end;justify-content:center;gap:var(--sg);width:calc(3 * var(--sw) + 2 * var(--sg));position:relative}
+.side.col{flex-direction:column;align-items:center;gap:8px}
+.side.stretch{align-self:stretch;align-items:stretch}
+.seatrow{display:flex;gap:var(--sg)}
+.stack{display:flex;flex-direction:column;gap:20px}
+.gap{flex:none;width:var(--sw)}
+.seat .s,.seat.occ .s{height:var(--sh);min-height:0;font-size:13px}
+.seat.occ .s{justify-content:flex-start;padding-top:2px}
+.seat.wide .s .lt{font-family:var(--sans);font-size:12px;font-weight:700;line-height:1.15;white-space:normal;text-align:center;padding:0 2px}
+.seat.occ.wide .s .lt{font-size:10px}
+.ovhrow{align-items:center;min-height:24px;height:auto;margin-block:0}
+.ovh{position:relative;transform:none;left:auto;top:auto;display:inline-block;border:0;background:var(--mon-wall);color:var(--on-status);font-size:11px;font-weight:600;border-radius:3px;padding:3px 12px;line-height:1.4;white-space:nowrap;cursor:default}
+.ovh.bin{width:calc(3 * var(--sw) + 2 * var(--sg));padding:1px 0;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.14em;text-align:center;background:var(--ovh-ok)}
+.ovh[data-m="1"],.ovh.bin[data-m="1"]{background:var(--warn)}
+.ovh[data-m="2"],.ovh.bin[data-m="2"]{background:var(--bad);color:#fff}
+.ovh[data-note]::before{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--ink);border-radius:0 0 3px 3px;pointer-events:none}
+.ovh.bin[data-note]::before{left:14px;right:14px}
+.sofa,.tbl{border-radius:10px;border:2px dashed var(--muted);background:var(--panel);color:var(--muted);font-weight:700;font-size:12px;letter-spacing:.08em;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+.sofa{width:calc(2 * var(--sw) + var(--sg));align-self:stretch}
+.tbl{height:48px;border-radius:6px;font-size:10px;letter-spacing:.02em;overflow:hidden}
+.room{display:flex;flex-direction:column;align-items:center;gap:8px;border:2px solid var(--rowno);border-radius:8px;padding:6px 6px 8px;background:var(--room)}
+.roomname{font-size:11px;font-weight:600;color:var(--rowno);line-height:1.2;text-align:center}
+.crewbox{gap:8px}
+/* PREVIEW / PDF: ขนาดเดียวกับรายงานของเว็บช่าง */
+.report{--mon-wall:#8ed873;--ovh-ok:#b4a7d6;--room:rgba(255,255,255,.55)}
+.report .rows{--sw:50px;--sg:6px;--sh:44px}
+.report .aisle{width:48px}
+.report .seat .s{min-height:0;font-size:12px;justify-content:center;padding-top:0}
+.report .seat.occ .s{justify-content:flex-start;padding-top:3px}
+.report .seat .nm{font-size:8.5px}
