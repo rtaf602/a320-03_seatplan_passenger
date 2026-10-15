@@ -3,5 +3,5 @@
  * ห้ามใส่รหัสผ่านหรือรหัสไฟล์ในไฟล์นี้ repo เป็น public ให้ตั้งค่าในส่วน SETUP ของ Apps Script เท่านั้น
  */
 window.SEATPLAN_CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbxzZpOwUBF3lZGBWeJaSPDxaGWvarR-MPBmCmSua38sCyhBCizEAHunoc_hjlW6vshW/exec'
+  API_URL: ''   // ใส่ URL /exec ของ Apps Script ในไฟล์ Seat Plan A320-03 TEMPORARY FOR PASSENGER
 };
