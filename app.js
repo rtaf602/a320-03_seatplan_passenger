@@ -717,7 +717,13 @@ function doAdminSave(){
   saving=true;$('aSave').disabled=true;$('aSave').textContent='กำลัง SAVE…';
   var sent=JSON.parse(JSON.stringify(D));
   return api(body).then(function(res){return afterSaveRes(res,sent,pd,'admin')},function(){toast('ติดต่อ Google Sheet ไม่ได้ ลองกด SAVE อีกครั้ง',true);return false})
-  .then(function(ok){saving=false;renderTools();if(ok)return load().then(function(){return ok});return ok});
+  .then(function(ok){saving=false;renderTools();if(!ok)return ok;
+    return load().then(function(){
+      /* the server drops a crew zone it does not accept (e.g. an old Apps Script version) — say so instead of reverting silently */
+      if(pd.crew&&sent.crew){var sv=savedCrew();
+        if(String(sent.crew.front||'')!==sv.front||String(sent.crew.rear||'')!==sv.rear)
+          toast('ระบบหลังบ้านไม่รับค่า CREW ZONE ที่เลือก (Apps Script อาจยังเป็นรุ่นเก่า ให้วางโค้ด Code.gs ใหม่แล้ว Deploy เป็น New version)',true)}
+      return ok})});
 }
 $('aSave').addEventListener('click',function(){doAdminSave()});
 
