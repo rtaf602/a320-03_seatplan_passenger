@@ -123,11 +123,15 @@ function crewRows(c){var set={},fi=ROWS.indexOf(c.front),ri=ROWS.indexOf(c.rear)
 function isCrew(id,set){return !!(set||crewRows(getCrew()))[SEAT[id].row]}
 
 /* one category per seat: crew > occupied > unusable > free */
-function zoneStats(){var set=crewRows(getCrew()),T={},sum={t:0,crew:0,occ:0,bad:0,free:0};
-  ZONES.forEach(function(z){T[z.key]={t:0,crew:0,occ:0,bad:0,free:0}});
+/* free = not CREW ZONE and no passenger name. Unusable seats can still be filled, so they count as free;
+   bad = unusable seats outside CREW ZONE that are still free (shown as a notice). crewOcc = crew names (ADMIN only) */
+var STAT_KEYS=['t','crew','crewOcc','occ','bad','free'];
+function zoneStats(){var set=crewRows(getCrew()),T={},sum={};STAT_KEYS.forEach(function(k){sum[k]=0});
+  ZONES.forEach(function(z){var o={};STAT_KEYS.forEach(function(k){o[k]=0});T[z.key]=o});
   SEATS.forEach(function(id){var z=T[SEAT[id].zone];z.t++;
-    if(isCrew(id,set))z.crew++;else if(getPax(id))z.occ++;else if(status(id).s===2)z.bad++;else z.free++});
-  ZONES.forEach(function(z){var v=T[z.key];['t','crew','occ','bad','free'].forEach(function(k){sum[k]+=v[k]})});
+    if(isCrew(id,set)){z.crew++;if(getCrewPax(id))z.crewOcc++}
+    else if(getPax(id))z.occ++;else{z.free++;if(status(id).s===2)z.bad++}});
+  ZONES.forEach(function(z){var v=T[z.key];STAT_KEYS.forEach(function(k){sum[k]+=v[k]})});
   T.sum=sum;return T}
 
 /* ---------- time (Thai local time, UTC+7) ---------- */
@@ -511,7 +515,7 @@ function buildZones(host,report,mode){
     var sec=el('section','zone zone-'+z.key),h=el('header'),v=stats[z.key];
     h.appendChild(el('h2',null,z.title));
     var bd=el('span','badge'+(v.free?'':' zero'));bd.append('ที่นั่งว่าง ');bd.appendChild(el('b',null,String(v.free)));
-    bd.title='ที่นั่งว่างสำหรับผู้โดยสาร '+v.free+' ที่นั่ง (ไม่นับที่นั่งที่มีชื่อแล้ว ที่นั่งใช้ไม่ได้ และ CREW ZONE)';h.appendChild(bd);sec.appendChild(h);
+    bd.title='ที่นั่งว่างสำหรับผู้โดยสาร '+v.free+' ที่นั่ง (ไม่นับที่นั่งที่มีชื่อแล้ว และ CREW ZONE · ที่นั่งใช้งานไม่ได้ยังกรอกชื่อได้ จึงนับรวมด้วย)';h.appendChild(bd);sec.appendChild(h);
     var box=el('div','rows'),cbox=null;
     function put(row,keys){
       if(keys.some(function(k){return crew[k]})){if(!cbox){cbox=el('div','crewbox');cbox.appendChild(el('div','crewlbl','CREW ZONE'));box.appendChild(cbox)}cbox.appendChild(row)}
@@ -558,7 +562,11 @@ function renderSeatSum(){$('seatSum').textContent='';$('seatSumA').textContent='
   var main=el('div','ss-main'+(s.free?'':' zero'));main.appendChild(el('small',null,'ที่นั่งคงเหลือสำหรับผู้โดยสาร'));
   var big=el('b',null,String(s.free));main.appendChild(big);main.appendChild(el('span',null,'จาก '+s.t+' ที่นั่ง'));host.appendChild(main);
   var g=el('div','ss-grid');
-  [['มีผู้โดยสาร',s.occ,'occ'],['CREW ZONE',s.crew,'crew'],['ใช้งานไม่ได้',s.bad,'bad']].forEach(function(x){
+  var chips=[['มีผู้โดยสาร',String(s.occ),'occ']];
+  /* crew details only on the ADMIN page */
+  if(view==='admin')chips.push(['ลูกเรือกรอกชื่อแล้ว',s.crewOcc+' / '+s.crew,'crew']);
+  if(s.bad)chips.push(['ใช้งานไม่ได้ (ยังกรอกได้)',String(s.bad),'bad']);
+  chips.forEach(function(x){
     var c=el('div','ss-item '+x[2]);c.appendChild(el('small',null,x[0]));c.appendChild(el('b',null,String(x[1])));g.appendChild(c)});
   host.appendChild(g);
   var z=el('div','ss-zones');ZONES.forEach(function(zz){var v=T[zz.key],c=el('span','ss-z'+(v.free?'':' zero'));
@@ -620,8 +628,8 @@ function openSeat(id){
   $('dSub').textContent=(pend?'มีการแก้ไขที่ยังไม่ SAVE · ':'')+(sv&&sv.at?'บันทึกล่าสุด '+[sv.by,sv.at].filter(Boolean).join(' · '):'ยังไม่มีการบันทึกที่นั่งนี้');
   var canEdit,msg=[],bad=false;
   if(mode==='crew'){canEdit=crew&&!closed();if(!crew){msg.push('ที่นั่งนี้ไม่อยู่ใน CREW ZONE ข้อมูลลูกเรือกรอกได้เฉพาะที่นั่งใน CREW ZONE');bad=true}}
-  else{canEdit=!crew&&st.s!==2&&!closed();if(crew){msg.push('ที่นั่งนี้อยู่ใน CREW ZONE กันไว้ให้ลูกเรือ ผู้โดยสารกรอกไม่ได้');bad=true}}
-  if(st.s===2){msg.push('ที่นั่งนี้ใช้งานไม่ได้'+(st.note?' : '+st.note:'')+(mode==='pax'?' กรอกผู้โดยสารไม่ได้':''));bad=true}
+  else{canEdit=!crew&&!closed();if(crew){msg.push('ที่นั่งนี้อยู่ใน CREW ZONE กันไว้ให้ลูกเรือ ผู้โดยสารกรอกไม่ได้');bad=true}}
+  if(st.s===2){msg.push('ที่นั่งนี้ใช้งานไม่ได้'+(st.note?' : '+st.note:'')+' (ยังกรอกชื่อได้)');bad=true}
   else if(st.s===1)msg.push('ที่นั่งนี้มีข้อขัดข้องแต่ยังใช้ได้'+(st.note?' : '+st.note:''));
   if(SEAT[id].mon&&st.m)msg.push('จอ Monitor '+(st.m===2?'เสีย':'เสื่อมสภาพ')+(status(id).note&&!st.s?' : '+st.note:''));
   if(closed())msg.push('ภารกิจปิดแล้ว ดูได้อย่างเดียว');
@@ -833,7 +841,7 @@ function excelModel(mode,blank){
   var part=function(n,L,label,w){return {w:w||1,seat:L==='_'?null:seatObj(n+L,label||(n+L),false)}};
   var monItem=function(ids,ovhd,crewKey){return {type:'ovh',crew:!!set[crewKey],label:ovhd?'OVHD 12.0"':'Monitor 21.5"',ovhd:ovhd,w:2,
     mon:ids.map(function(id){return id?status(id).m:null})}};
-  var zones=ZONES.map(function(z){var v=stats[z.key],free=blank?(v.t-v.crew-v.bad):v.free,items=[],last='';
+  var zones=ZONES.map(function(z){var v=stats[z.key],free=blank?(v.t-v.crew):v.free,items=[],last='';
     z.lines.forEach(function(ln,li){
       if(ln.mon){var nx=z.lines.slice(li+1).filter(function(x){return x.n!=null||x.L2})[0];
         items.push(monItem(ln.mon,ln.ovhd,ln.mon.filter(Boolean)[0].indexOf('MON-A')===0||!nx?last:String(nx.n!=null?nx.n:nx.L2[0][0])));return}
