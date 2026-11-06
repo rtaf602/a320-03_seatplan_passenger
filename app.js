@@ -432,7 +432,7 @@ function setView(v,quiet){
   if(!quiet)renderAll();
 }
 function dropAdmin(){atok='';admUser='';if(M)M.crewPax=null}
-function renderAll(){if(!M)return;renderTitle();renderInfo();renderPlan();renderManifest();renderHistory();renderAdmin();renderTools();renderNotice()}
+function renderAll(){if(!M)return;renderTitle();renderInfo();renderPlan();renderSeatSum();renderManifest();renderHistory();renderAdmin();renderTools();renderNotice()}
 function renderNotice(){var n=$('notice'),msgs=[];
   if(closed())msgs.push('ภารกิจนี้ปิดแล้ว ('+(M.closeInfo||'')+') ดูได้อย่างเดียว ถ้าต้องการแก้ไขให้เปิดภารกิจอีกครั้งจากหน้ารายการภารกิจ');
   if(M.statusError)msgs.push('อ่านสภาพที่นั่งจากไฟล์ '+ADMIN_FILE+' ไม่ได้ ('+M.statusError+') ผังจึงแสดงทุกที่นั่งเป็นปกติ');
@@ -552,6 +552,20 @@ function buildZones(host,report,mode){
   });
 }
 function renderPlan(){buildZones($('zones'),false,view==='admin'?'crew':'pax')}
+/* ที่นั่งคงเหลือทั้งลำ ในการ์ดข้อมูลภารกิจ — นับรวมรายชื่อและ CREW ZONE ที่ยังไม่ SAVE ด้วย */
+function renderSeatSum(){$('seatSum').textContent='';$('seatSumA').textContent='';if(!M)return;var host=$(view==='admin'?'seatSumA':'seatSum');
+  var T=zoneStats(),s=T.sum,pend=pending(view==='admin'?'admin':'pax').n>0;
+  var main=el('div','ss-main'+(s.free?'':' zero'));main.appendChild(el('small',null,'ที่นั่งคงเหลือสำหรับผู้โดยสาร'));
+  var big=el('b',null,String(s.free));main.appendChild(big);main.appendChild(el('span',null,'จาก '+s.t+' ที่นั่ง'));host.appendChild(main);
+  var g=el('div','ss-grid');
+  [['มีผู้โดยสาร',s.occ,'occ'],['CREW ZONE',s.crew,'crew'],['ใช้งานไม่ได้',s.bad,'bad']].forEach(function(x){
+    var c=el('div','ss-item '+x[2]);c.appendChild(el('small',null,x[0]));c.appendChild(el('b',null,String(x[1])));g.appendChild(c)});
+  host.appendChild(g);
+  var z=el('div','ss-zones');ZONES.forEach(function(zz){var v=T[zz.key],c=el('span','ss-z'+(v.free?'':' zero'));
+    c.appendChild(el('span',null,zz.title));c.appendChild(el('b',null,String(v.free)));z.appendChild(c)});
+  host.appendChild(z);
+  if(pend)host.appendChild(el('p','ss-note','รวมรายการที่ยังไม่ SAVE'));
+}
 $('zones').addEventListener('click',function(e){var b=e.target.closest('.seat[data-id]');if(b)openSeat(b.dataset.id)});
 
 /* ----- manifest (passengers, or crew on the ADMIN page) ----- */
@@ -627,7 +641,7 @@ function setPerson(mode,id,val){
   if(!bag[id])bag[id]={base:norm(saved),val:null};
   bag[id].val=norm(val);cleanDraft();persistDraft();
 }
-function afterEdit(){renderPlan();renderManifest();renderTools()}
+function afterEdit(){renderPlan();renderSeatSum();renderManifest();renderTools()}
 $('dOk').addEventListener('click',function(){
   if(!cur)return;var id=cur,mode=curMode;
   var v={};PF.forEach(function(k){var x=$(FIELDS[k]).value.trim().replace(/\s{2,}/g,' ');if(k==='rt'||k==='re')x=x.replace(/\s+/g,'');if(k==='re'||k==='fe'||k==='le')x=x.toUpperCase();v[k]=x});

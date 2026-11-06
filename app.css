@@ -351,3 +351,22 @@ dialog.wide[open]{display:flex;flex-direction:column}
 .report .seat .s{min-height:0;font-size:12px;justify-content:center;padding-top:0}
 .report .seat.occ .s{justify-content:flex-start;padding-top:3px}
 .report .seat .nm{font-size:8.5px}
+
+/* ที่นั่งคงเหลือ ในการ์ดข้อมูลภารกิจ */
+.seatsum{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:10px 18px;align-items:center}
+.ss-main{display:flex;flex-direction:column;align-items:flex-start;background:var(--accent);color:var(--accent-ink);border-radius:8px;padding:8px 16px;min-width:150px}
+.ss-main small{font-size:12px;font-weight:600;opacity:.9}
+.ss-main b{font-family:var(--mono);font-size:32px;line-height:1.1}
+.ss-main span{font-size:12px;opacity:.9}
+.ss-main.zero{background:var(--muted)}
+.ss-grid{display:flex;flex-wrap:wrap;gap:8px}
+.ss-item{display:flex;flex-direction:column;border:1px solid var(--line);border-left-width:4px;border-radius:6px;padding:4px 12px;min-width:96px}
+.ss-item small{font-size:12px;color:var(--muted)}
+.ss-item b{font-family:var(--mono);font-size:18px}
+.ss-item.occ{border-left-color:var(--accent)}.ss-item.crew{border-left-color:var(--crew)}.ss-item.bad{border-left-color:var(--bad)}
+.ss-zones{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.ss-z{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px}
+.ss-z b{font-family:var(--mono);background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 8px;min-width:12px;text-align:center}
+.ss-z.zero b{background:var(--muted)}
+.ss-note{grid-column:1/-1;margin:0;font-size:12px;color:var(--warn)}
+@media (max-width:520px){.seatsum{grid-template-columns:1fr}.ss-main{min-width:0;width:100%;box-sizing:border-box}}
