@@ -559,18 +559,24 @@ function renderPlan(){buildZones($('zones'),false,view==='admin'?'crew':'pax')}
 /* ที่นั่งคงเหลือทั้งลำ ในการ์ดข้อมูลภารกิจ — นับรวมรายชื่อและ CREW ZONE ที่ยังไม่ SAVE ด้วย */
 function renderSeatSum(){$('seatSum').textContent='';$('seatSumA').textContent='';if(!M)return;var host=$(view==='admin'?'seatSumA':'seatSum');
   var T=zoneStats(),s=T.sum,pend=pending(view==='admin'?'admin':'pax').n>0;
-  var main=el('div','ss-main'+(s.free?'':' zero'));main.appendChild(el('small',null,'ที่นั่งคงเหลือสำหรับผู้โดยสาร'));
-  var big=el('b',null,String(s.free));main.appendChild(big);main.appendChild(el('span',null,'จาก '+s.t+' ที่นั่ง'));host.appendChild(main);
+  /* 2 แบบ: รวมที่นั่งใช้งานไม่ได้ (ยังกรอกชื่อได้) และ ไม่รวมที่นั่งใช้งานไม่ได้ */
+  var mains=el('div','ss-mains');
+  [['ที่นั่งคงเหลือ','รวมที่นั่งใช้งานไม่ได้',s.free,''],['ที่นั่งคงเหลือ','ไม่รวมที่นั่งใช้งานไม่ได้',s.free-s.bad,' alt']].forEach(function(x){
+    var m=el('div','ss-main'+x[3]+(x[2]?'':' zero'));m.appendChild(el('small',null,x[0]));m.appendChild(el('em',null,x[1]));
+    m.appendChild(el('b',null,String(x[2])));m.appendChild(el('span',null,'จาก '+s.t+' ที่นั่ง'));mains.appendChild(m)});
+  host.appendChild(mains);
   var g=el('div','ss-grid');
   var chips=[['มีผู้โดยสาร',String(s.occ),'occ']];
   /* crew details only on the ADMIN page */
   if(view==='admin')chips.push(['ลูกเรือกรอกชื่อแล้ว',s.crewOcc+' / '+s.crew,'crew']);
-  if(s.bad)chips.push(['ใช้งานไม่ได้ (ยังกรอกได้)',String(s.bad),'bad']);
+  chips.push(['ที่นั่งว่างที่ใช้งานไม่ได้',String(s.bad),'bad']);
   chips.forEach(function(x){
     var c=el('div','ss-item '+x[2]);c.appendChild(el('small',null,x[0]));c.appendChild(el('b',null,String(x[1])));g.appendChild(c)});
   host.appendChild(g);
   var z=el('div','ss-zones');ZONES.forEach(function(zz){var v=T[zz.key],c=el('span','ss-z'+(v.free?'':' zero'));
-    c.appendChild(el('span',null,zz.title));c.appendChild(el('b',null,String(v.free)));z.appendChild(c)});
+    c.appendChild(el('span',null,zz.title));c.appendChild(el('b',null,String(v.free)));
+    if(v.bad){c.appendChild(el('i',null,'ไม่รวมใช้ไม่ได้ '+(v.free-v.bad)))}
+    c.title='ที่นั่งคงเหลือ '+v.free+' (รวมที่นั่งใช้งานไม่ได้) · '+(v.free-v.bad)+' (ไม่รวมที่นั่งใช้งานไม่ได้)';z.appendChild(c)});
   host.appendChild(z);
   if(pend)host.appendChild(el('p','ss-note','รวมรายการที่ยังไม่ SAVE'));
 }
